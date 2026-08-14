@@ -1,0 +1,75 @@
+version: "0.1"
+
+tone: signals_not_emotions
+
+dimensions:
+  pacing:
+    weight: 1.0
+    thresholds:
+      wpm_low: 100
+      wpm_high: 180
+      filler_rate_concerning: 0.03  # fillers per word
+      filler_rate_bad: 0.06
+      pause_long_seconds: 3.0
+    good: "Varied pace with purposeful pauses; low filler frequency"
+    concerning: "Frequent fillers or uneven pacing"
+    bad: "Excessive fillers, rushing, or many awkward silences"
+
+  prosody:
+    weight: 1.0
+    thresholds:
+      vocal_variety_low: 0.3
+      monotone_segment_seconds: 15
+      energy_drop_threshold: 0.4
+    good: "Dynamic vocal range; energy matches content importance"
+    concerning: "Extended monotone segments or inconsistent energy"
+    bad: "Flat delivery throughout or frequent energy drops at key moments"
+
+  content:
+    weight: 1.0
+    thresholds:
+      hedging_rate_concerning: 0.02
+      hedging_rate_bad: 0.05
+    good: "Clear structure, confident language, questions addressed directly"
+    concerning: "Frequent hedging or unclear transitions"
+    bad: "Disorganized, heavy hedging, questions dodged"
+
+  speaker_facial:
+    weight: 0.8
+    thresholds:
+      eye_contact_low: 0.5
+      expressiveness_low: 0.3
+    good: "Consistent eye contact; expressive and engaged facial signals"
+    concerning: "Frequent gaze breaks or low expressiveness"
+    bad: "Rarely facing camera; flat facial signals throughout"
+
+  audience_engagement:
+    weight: 1.0
+    thresholds:
+      attention_low: 0.6
+      attention_critical: 0.4
+    good: "Sustained audience attention above 80%"
+    concerning: "Multiple attention drops below 60%"
+    bad: "Prolonged audience disengagement"
+
+  audience_reaction:
+    weight: 0.8
+    thresholds:
+      positive_ratio_low: 0.3
+      negative_ratio_high: 0.3
+    good: "Frequent positive reactions (nods, smiles); few negative signals"
+    concerning: "Mixed or neutral reactions; occasional confusion"
+    bad: "Frequent negative reactions or confusion signals"
+
+coaching:
+  framing: >
+    All feedback must reference observable signals, never inferred emotions.
+    Say "60% of audience members were looking away" not "the audience was bored."
+    Be specific, constructive, and actionable.
+  structure:
+    - overall_assessment
+    - what_worked
+    - what_to_improve
+    - key_moments
+    - audience_reception
+    - next_steps

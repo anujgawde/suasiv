@@ -1,0 +1,42 @@
+workspace: .workspace
+
+analyzers:
+  transcript:
+    enabled: true
+    model_size: base  # base | small | medium | large
+  diarization:
+    enabled: true
+  pacing:
+    enabled: true
+    window_seconds: 30
+  prosody:
+    enabled: true
+    window_seconds: 5
+  content:
+    enabled: true
+  speaker_facial:
+    enabled: true
+    fps: 3
+  audience_engagement:
+    enabled: true
+    fps: 3
+  audience_reaction:
+    enabled: true
+    fps: 3
+  audience_verbal:
+    enabled: true
+
+llm:
+  backend: ollama  # ollama | gemini | groq
+  model: llama3.1:8b
+  # api_key: set via SUASIV_LLM_API_KEY env var for gemini/groq
+
+report:
+  format: markdown  # markdown | html
+
+ingest:
+  frame_fps: 3
+  audio_sample_rate: 16000
+
+fusion:
+  window_seconds: 5
