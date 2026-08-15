@@ -39,7 +39,9 @@ def run_pipeline(video_path: str, config: SuasivConfig) -> Path:
 
     console.print("[dim]Step 1/5:[/dim] Ingesting media...")
     ingest(ctx)
-    console.print(f"  Duration: {ctx.duration:.1f}s | Tiles: {len(ctx.tiles)}")
+    console.print(
+        f"  Duration: {ctx.duration:.1f}s | {ctx.frame_count} frames | {len(ctx.tiles)} tile(s)"
+    )
 
     analyzer_map = {cls.name: cls for cls in ALL_ANALYZERS}
     ordered = [analyzer_map[name] for name in ANALYZER_ORDER if name in analyzer_map]

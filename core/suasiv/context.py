@@ -24,8 +24,10 @@ class MediaContext:
 
     audio_path: Path | None = None
     frames_dir: Path | None = None
+    tiles_dir: Path | None = None
     tiles: list[TileInfo] = field(default_factory=list)
     speaker_tile_index: int | None = None
+    frame_count: int = 0
 
     transcript: list[dict] | None = None
     speaker_labels: dict[str, str] | None = None
