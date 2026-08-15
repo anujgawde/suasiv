@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 
-import numpy as np
 from rich.console import Console
 
 from suasiv.analyzers.base import Analyzer

@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from rich.console import Console
 
-from suasiv.analyzers import ALL_ANALYZERS
+from suasiv.analyzers import get_analyzer_class
 from suasiv.config import SuasivConfig
 from suasiv.context import MediaContext
 from suasiv.fusion import fuse, stitch_chunk_results
@@ -32,6 +32,42 @@ ANALYZER_ORDER = [
 _CHUNKABLE = {"speaker_facial", "audience_engagement", "audience_reaction"}
 
 
+def _run_analyzer_safe(
+    name: str, ctx: MediaContext, config: SuasivConfig
+) -> AnalyzerResult:
+    if not config.analyzer_enabled(name):
+        console.print(f"  [dim]Skipping {name} (disabled)[/dim]")
+        return AnalyzerResult(
+            analyzer=name, status="skipped", error_message="disabled by config"
+        )
+
+    try:
+        cls = get_analyzer_class(name)
+    except (ImportError, KeyError) as e:
+        console.print(f"  [yellow]Skipping {name}: dependency not installed[/yellow]")
+        return AnalyzerResult(
+            analyzer=name, status="failed", error_message=f"import error: {e}"
+        )
+
+    analyzer = cls()
+    try:
+        console.print(f"  Running [green]{analyzer.name}[/green]...")
+        result = analyzer.analyze(ctx)
+        if result.summary.get("error") and result.status == "ok":
+            result.status = "skipped"
+            result.error_message = result.summary["error"]
+        if result.status == "ok":
+            console.print(f"    → {len(result.signals)} signals")
+        else:
+            console.print(f"    [dim]→ {result.error_message}[/dim]")
+        return result
+    except Exception as e:
+        console.print(f"  [red]FAILED {name}: {e}[/red]")
+        return AnalyzerResult(
+            analyzer=name, status="failed", error_message=str(e)
+        )
+
+
 def run_pipeline(video_path: str, config: SuasivConfig) -> Path:
     ctx = MediaContext(
         video_path=Path(video_path),
@@ -47,26 +83,17 @@ def run_pipeline(video_path: str, config: SuasivConfig) -> Path:
         f"  Duration: {ctx.duration:.1f}s | {ctx.frame_count} frames | {len(ctx.tiles)} tile(s)"
     )
 
-    analyzer_map = {cls.name: cls for cls in ALL_ANALYZERS}
-    ordered = [analyzer_map[name] for name in ANALYZER_ORDER if name in analyzer_map]
-
-    full_run = [cls for cls in ordered if cls.name not in _CHUNKABLE]
-    chunkable = [cls for cls in ordered if cls.name in _CHUNKABLE]
+    full_run = [n for n in ANALYZER_ORDER if n not in _CHUNKABLE]
+    chunkable = [n for n in ANALYZER_ORDER if n in _CHUNKABLE]
 
     console.print("[dim]Step 2/5:[/dim] Running analyzers...")
-    results: list[AnalyzerResult] = []
+    all_results: list[AnalyzerResult] = []
 
-    for cls in full_run:
-        analyzer = cls()
-        if not config.analyzer_enabled(analyzer.name):
-            console.print(f"  [dim]Skipping {analyzer.name} (disabled)[/dim]")
-            continue
-        console.print(f"  Running [green]{analyzer.name}[/green]...")
-        result = analyzer.analyze(ctx)
-        results.append(result)
-        console.print(f"    → {len(result.signals)} signals")
+    for name in full_run:
+        result = _run_analyzer_safe(name, ctx, config)
+        all_results.append(result)
 
-    enabled_chunkable = [cls for cls in chunkable if config.analyzer_enabled(cls.name)]
+    enabled_chunkable = [n for n in chunkable if config.analyzer_enabled(n)]
     needs_chunking = (
         ctx.duration > config.fusion.chunk_seconds
         and enabled_chunkable
@@ -75,27 +102,36 @@ def run_pipeline(video_path: str, config: SuasivConfig) -> Path:
 
     if needs_chunking:
         chunk_results = _run_chunked(ctx, enabled_chunkable, config)
-        results.extend(chunk_results)
+        all_results.extend(chunk_results)
     else:
-        for cls in chunkable:
-            analyzer = cls()
-            if not config.analyzer_enabled(analyzer.name):
-                console.print(f"  [dim]Skipping {analyzer.name} (disabled)[/dim]")
-                continue
-            console.print(f"  Running [green]{analyzer.name}[/green]...")
-            result = analyzer.analyze(ctx)
-            results.append(result)
-            console.print(f"    → {len(result.signals)} signals")
+        for name in chunkable:
+            result = _run_analyzer_safe(name, ctx, config)
+            all_results.append(result)
+
+    ok_results = [r for r in all_results if r.status == "ok"]
+    skipped_names = [r.analyzer for r in all_results if r.status == "skipped"]
+    failed_info = [
+        {"name": r.analyzer, "reason": r.error_message or "unknown"}
+        for r in all_results
+        if r.status == "failed"
+    ]
+
+    if skipped_names:
+        console.print(f"  [dim]Skipped: {', '.join(skipped_names)}[/dim]")
+    if failed_info:
+        console.print(
+            f"  [yellow]Failed: {', '.join(f['name'] for f in failed_info)}[/yellow]"
+        )
 
     console.print("[dim]Step 3/5:[/dim] Fusing signals...")
-    timeline = fuse(ctx, results)
+    timeline = fuse(ctx, ok_results)
     console.print(f"  {len(timeline.signals)} signals, {len(timeline.moments)} moments")
 
     console.print("[dim]Step 4/5:[/dim] Generating coaching narrative...")
     rubric = _load_rubric()
-    scores = _compute_scores(results, rubric)
+    scores = _compute_scores(ok_results, rubric)
     system_prompt = _build_system_prompt(rubric)
-    user_prompt = _build_user_prompt(ctx, results, timeline, scores)
+    user_prompt = _build_user_prompt(ctx, ok_results, timeline, scores)
 
     llm = get_backend(config.llm.backend, config.llm)
     narrative = llm.complete(system_prompt, user_prompt)
@@ -107,7 +143,9 @@ def run_pipeline(video_path: str, config: SuasivConfig) -> Path:
         metadata={
             "video": video_path,
             "duration": ctx.duration,
-            "analyzers_run": [r.analyzer for r in results],
+            "analyzers_run": [r.analyzer for r in ok_results],
+            "skipped_analyzers": skipped_names,
+            "failed_analyzers": failed_info,
         },
     )
 
@@ -140,7 +178,7 @@ def _load_rubric() -> dict:
 
 
 def _compute_scores(results: list[AnalyzerResult], rubric: dict) -> dict[str, float]:
-    summaries = {r.analyzer: r.summary for r in results}
+    summaries = {r.analyzer: r.summary for r in results if r.status == "ok"}
     dims = rubric.get("dimensions", {})
     scores: dict[str, float] = {}
 
@@ -279,7 +317,7 @@ def _build_user_prompt(
 
     summary_lines: list[str] = []
     for r in results:
-        if r.summary and not r.summary.get("error"):
+        if r.status == "ok" and r.summary and not r.summary.get("error"):
             items = ", ".join(f"{k}={v}" for k, v in r.summary.items())
             summary_lines.append(f"- {r.analyzer}: {items}")
 
@@ -328,7 +366,7 @@ def _compute_chunks(
 
 def _run_chunked(
     ctx: MediaContext,
-    analyzer_classes: list[type],
+    analyzer_names: list[str],
     config: SuasivConfig,
 ) -> list[AnalyzerResult]:
     chunk_sec = config.fusion.chunk_seconds
@@ -337,12 +375,9 @@ def _run_chunked(
 
     if len(chunks) <= 1:
         results: list[AnalyzerResult] = []
-        for cls in analyzer_classes:
-            analyzer = cls()
-            console.print(f"  Running [green]{analyzer.name}[/green]...")
-            result = analyzer.analyze(ctx)
+        for name in analyzer_names:
+            result = _run_analyzer_safe(name, ctx, config)
             results.append(result)
-            console.print(f"    → {len(result.signals)} signals")
         return results
 
     console.print(
@@ -359,27 +394,44 @@ def _run_chunked(
         chunk_ctx = _create_chunk_context(ctx, c_start, c_end)
         chunk_results: list[AnalyzerResult] = []
 
-        for cls in analyzer_classes:
-            analyzer = cls()
-            console.print(f"    Running [green]{analyzer.name}[/green]...")
-            result = analyzer.analyze(chunk_ctx)
+        for name in analyzer_names:
+            result = _run_analyzer_safe(name, chunk_ctx, config)
             chunk_results.append(result)
-            console.print(f"      → {len(result.signals)} signals")
 
         all_chunk_results.append(chunk_results)
         shutil.rmtree(chunk_ctx.workspace, ignore_errors=True)
 
-    stitched = stitch_chunk_results(all_chunk_results, chunks, overlap)
+    ok_chunks = [
+        [r for r in chunk if r.status == "ok"] for chunk in all_chunk_results
+    ]
+    stitched = stitch_chunk_results(ok_chunks, chunks, overlap)
 
-    total_before = sum(
-        len(r.signals) for chunk in all_chunk_results for r in chunk
-    )
+    failed_in_chunks = [
+        r for chunk in all_chunk_results for r in chunk if r.status == "failed"
+    ]
+    skipped_in_chunks = [
+        r for chunk in all_chunk_results for r in chunk if r.status == "skipped"
+    ]
+
+    total_before = sum(len(r.signals) for chunk in ok_chunks for r in chunk)
     total_after = sum(len(r.signals) for r in stitched)
     if total_before != total_after:
         console.print(
             f"  Stitched {len(chunks)} chunks → {total_after} signals "
             f"(deduped {total_before - total_after})"
         )
+
+    seen_failed = set()
+    for r in failed_in_chunks:
+        if r.analyzer not in seen_failed:
+            stitched.append(r)
+            seen_failed.add(r.analyzer)
+
+    seen_skipped = set()
+    for r in skipped_in_chunks:
+        if r.analyzer not in seen_skipped and r.analyzer not in seen_failed:
+            stitched.append(r)
+            seen_skipped.add(r.analyzer)
 
     return stitched
 

@@ -3,6 +3,19 @@
 **Video:** {{ metadata.get('video', 'N/A') }}
 **Duration:** {{ metadata.get('duration', 0) | fmt_time }}
 **Analyzers:** {{ metadata.get('analyzers_run', []) | join(', ') }}
+{% if metadata.get('skipped_analyzers') or metadata.get('failed_analyzers') %}
+
+> **Note:** Some analyzers were not run.
+{% if metadata.get('skipped_analyzers') %}
+> *Skipped (disabled or missing data):* {{ metadata.get('skipped_analyzers', []) | join(', ') }}
+{% endif %}
+{% if metadata.get('failed_analyzers') %}
+> *Failed:*
+{% for f in metadata.get('failed_analyzers', []) %}
+> - {{ f.name }}: {{ f.reason }}
+{% endfor %}
+{% endif %}
+{% endif %}
 
 ---
 

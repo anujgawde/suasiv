@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import numpy as np
 from rich.console import Console
 
 from suasiv.analyzers.base import Analyzer
@@ -12,16 +11,13 @@ from suasiv.schema import AnalyzerResult, Signal
 
 console = Console()
 
-_MODEL_POINTS = np.array(
-    [
-        (0.0, 0.0, 0.0),
-        (0.0, -330.0, -65.0),
-        (-225.0, 170.0, -135.0),
-        (225.0, 170.0, -135.0),
-        (-150.0, -150.0, -125.0),
-        (150.0, -150.0, -125.0),
-    ],
-    dtype=np.float64,
+_MODEL_POINTS_RAW = (
+    (0.0, 0.0, 0.0),
+    (0.0, -330.0, -65.0),
+    (-225.0, 170.0, -135.0),
+    (225.0, 170.0, -135.0),
+    (-150.0, -150.0, -125.0),
+    (150.0, -150.0, -125.0),
 )
 
 _POSE_LANDMARKS = [1, 199, 33, 263, 61, 291]
@@ -45,6 +41,8 @@ class SpeakerFacialAnalyzer(Analyzer):
     requires = {"frames"}
 
     def analyze(self, ctx: MediaContext) -> AnalyzerResult:
+        import numpy as np
+
         try:
             import mediapipe as mp  # noqa: F841
         except ImportError:
@@ -191,7 +189,9 @@ def _get_speaker_frames_dir(ctx: MediaContext) -> Path | None:
 
 def _estimate_head_pose(landmarks, img_w: int, img_h: int) -> tuple[float, float]:
     import cv2
+    import numpy as np
 
+    model_points = np.array(_MODEL_POINTS_RAW, dtype=np.float64)
     image_points = np.array(
         [(landmarks[i].x * img_w, landmarks[i].y * img_h) for i in _POSE_LANDMARKS],
         dtype=np.float64,
@@ -210,7 +210,7 @@ def _estimate_head_pose(landmarks, img_w: int, img_h: int) -> tuple[float, float
     dist_coeffs = np.zeros((4, 1))
 
     success, rotation_vec, _ = cv2.solvePnP(
-        _MODEL_POINTS,
+        model_points,
         image_points,
         camera_matrix,
         dist_coeffs,
@@ -228,6 +228,8 @@ def _estimate_head_pose(landmarks, img_w: int, img_h: int) -> tuple[float, float
 
 
 def _estimate_gaze(landmarks) -> bool:
+    import numpy as np
+
     def iris_ratio(iris_indices, inner_idx, outer_idx):
         iris_x = np.mean([landmarks[i].x for i in iris_indices])
         inner_x = landmarks[inner_idx].x
@@ -243,7 +245,9 @@ def _estimate_gaze(landmarks) -> bool:
     return 0.3 <= avg <= 0.7
 
 
-def _extract_expression_coords(landmarks) -> np.ndarray:
+def _extract_expression_coords(landmarks):
+    import numpy as np
+
     coords: list[float] = []
     for i in _EXPRESSION_LANDMARKS:
         coords.extend([landmarks[i].x, landmarks[i].y])
@@ -253,6 +257,8 @@ def _extract_expression_coords(landmarks) -> np.ndarray:
 def _generate_signals(
     frame_data: list[dict], fps: int, primary_speaker: str | None
 ) -> list[Signal]:
+    import numpy as np
+
     signals: list[Signal] = []
     window = max(3, fps)
 

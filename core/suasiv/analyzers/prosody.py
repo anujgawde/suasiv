@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 
-import numpy as np
 from rich.console import Console
 
 from suasiv.analyzers.base import Analyzer
@@ -17,6 +16,8 @@ class ProsodyAnalyzer(Analyzer):
     requires = {"audio"}
 
     def analyze(self, ctx: MediaContext) -> AnalyzerResult:
+        import numpy as np
+
         try:
             import parselmouth
         except ImportError:
@@ -223,9 +224,9 @@ def _get_speaker_segments(ctx: MediaContext) -> list[tuple[float, float]]:
     return segments
 
 
-def _time_in_segments(
-    times: np.ndarray, segments: list[tuple[float, float]]
-) -> np.ndarray:
+def _time_in_segments(times, segments: list[tuple[float, float]]):
+    import numpy as np
+
     mask = np.zeros(len(times), dtype=bool)
     for start, end in segments:
         mask |= (times >= start) & (times <= end)

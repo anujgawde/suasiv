@@ -6,6 +6,43 @@ import yaml
 from pydantic import BaseModel, Field
 
 
+PRESETS: dict[str, dict[str, bool]] = {
+    "full": {
+        "transcript": True,
+        "diarization": True,
+        "pacing": True,
+        "prosody": True,
+        "content": True,
+        "speaker_facial": True,
+        "audience_engagement": True,
+        "audience_reaction": True,
+        "audience_verbal": True,
+    },
+    "standard": {
+        "transcript": True,
+        "diarization": True,
+        "pacing": True,
+        "prosody": True,
+        "content": True,
+        "speaker_facial": True,
+        "audience_engagement": True,
+        "audience_reaction": False,
+        "audience_verbal": True,
+    },
+    "lite": {
+        "transcript": True,
+        "diarization": False,
+        "pacing": True,
+        "prosody": False,
+        "content": True,
+        "speaker_facial": False,
+        "audience_engagement": False,
+        "audience_reaction": False,
+        "audience_verbal": True,
+    },
+}
+
+
 class AnalyzerConfig(BaseModel):
     enabled: bool = True
     model_size: str | None = None
@@ -35,6 +72,7 @@ class FusionConfig(BaseModel):
 
 
 class SuasivConfig(BaseModel):
+    preset: str | None = None
     workspace: str = ".workspace"
     analyzers: dict[str, AnalyzerConfig] = Field(default_factory=dict)
     llm: LLMConfig = Field(default_factory=LLMConfig)
@@ -57,9 +95,11 @@ class SuasivConfig(BaseModel):
 
     def analyzer_enabled(self, name: str) -> bool:
         cfg = self.analyzers.get(name)
-        if cfg is None:
-            return True
-        return cfg.enabled
+        if cfg is not None:
+            return cfg.enabled
+        if self.preset and self.preset in PRESETS:
+            return PRESETS[self.preset].get(name, True)
+        return True
 
     def analyzer_settings(self, name: str) -> AnalyzerConfig:
         return self.analyzers.get(name, AnalyzerConfig())

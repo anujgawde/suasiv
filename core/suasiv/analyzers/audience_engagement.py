@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 
-import numpy as np
 from rich.console import Console
 
 from suasiv.analyzers.base import Analyzer
@@ -11,16 +10,13 @@ from suasiv.schema import AnalyzerResult, Signal
 
 console = Console()
 
-_MODEL_POINTS = np.array(
-    [
-        (0.0, 0.0, 0.0),
-        (0.0, -330.0, -65.0),
-        (-225.0, 170.0, -135.0),
-        (225.0, 170.0, -135.0),
-        (-150.0, -150.0, -125.0),
-        (150.0, -150.0, -125.0),
-    ],
-    dtype=np.float64,
+_MODEL_POINTS_RAW = (
+    (0.0, 0.0, 0.0),
+    (0.0, -330.0, -65.0),
+    (-225.0, 170.0, -135.0),
+    (225.0, 170.0, -135.0),
+    (-150.0, -150.0, -125.0),
+    (150.0, -150.0, -125.0),
 )
 _POSE_LANDMARKS = [1, 199, 33, 263, 61, 291]
 
@@ -35,6 +31,8 @@ class AudienceEngagementAnalyzer(Analyzer):
     requires = {"frames", "diarization"}
 
     def analyze(self, ctx: MediaContext) -> AnalyzerResult:
+        import numpy as np  # noqa: F841
+
         try:
             import mediapipe as mp  # noqa: F841
         except ImportError:
@@ -178,7 +176,9 @@ def _get_audience_tile_dirs(ctx: MediaContext) -> list[tuple[int, object]]:
 
 def _estimate_head_pose(landmarks, img_w: int, img_h: int) -> tuple[float, float]:
     import cv2
+    import numpy as np
 
+    model_points = np.array(_MODEL_POINTS_RAW, dtype=np.float64)
     image_points = np.array(
         [(landmarks[i].x * img_w, landmarks[i].y * img_h) for i in _POSE_LANDMARKS],
         dtype=np.float64,
@@ -197,7 +197,7 @@ def _estimate_head_pose(landmarks, img_w: int, img_h: int) -> tuple[float, float
     dist_coeffs = np.zeros((4, 1))
 
     success, rotation_vec, _ = cv2.solvePnP(
-        _MODEL_POINTS,
+        model_points,
         image_points,
         camera_matrix,
         dist_coeffs,
@@ -240,6 +240,8 @@ def _build_attention_timeline(
 def _detect_attention_signals(
     timeline: list[dict], analyzer_name: str
 ) -> list[Signal]:
+    import numpy as np
+
     signals: list[Signal] = []
     in_drop = False
     drop_start = 0.0

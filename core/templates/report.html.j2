@@ -91,6 +91,25 @@
   <strong>Analyzers:</strong> {{ metadata.get('analyzers_run', []) | join(', ') }}
 </p>
 
+{% if metadata.get('skipped_analyzers') or metadata.get('failed_analyzers') %}
+<div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 0.8rem 1rem; margin: 1rem 0;">
+  <strong style="color: #92400e;">Some analyzers were not run:</strong>
+  {% if metadata.get('skipped_analyzers') %}
+  <p style="margin: 0.3rem 0; color: #92400e;">
+    <em>Skipped (disabled or missing data):</em> {{ metadata.get('skipped_analyzers', []) | join(', ') }}
+  </p>
+  {% endif %}
+  {% if metadata.get('failed_analyzers') %}
+  <p style="margin: 0.3rem 0; color: #92400e;"><em>Failed:</em></p>
+  <ul style="margin: 0.2rem 0; color: #92400e;">
+    {% for f in metadata.get('failed_analyzers', []) %}
+    <li>{{ f.name }}: {{ f.reason }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endif %}
+
 <h2>Summary Scores</h2>
 <div class="overflow-x">
 <table class="scores">

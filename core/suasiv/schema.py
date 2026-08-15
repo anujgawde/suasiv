@@ -17,6 +17,8 @@ class AnalyzerResult(BaseModel):
     analyzer: str
     signals: list[Signal] = Field(default_factory=list)
     summary: dict = Field(default_factory=dict)
+    status: str = "ok"
+    error_message: str | None = None
 
 
 class Moment(BaseModel):

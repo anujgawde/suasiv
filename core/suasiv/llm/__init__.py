@@ -14,5 +14,12 @@ BACKENDS: dict[str, type[LLMBackend]] = {
 
 
 def get_backend(name: str, config: LLMConfig) -> LLMBackend:
-    cls = BACKENDS.get(name, StubBackend)
+    cls = BACKENDS.get(name)
+    if cls is None:
+        from rich.console import Console
+
+        Console().print(
+            f"[yellow]Warning: unknown LLM backend '{name}', falling back to stub[/yellow]"
+        )
+        cls = StubBackend
     return cls(config)
