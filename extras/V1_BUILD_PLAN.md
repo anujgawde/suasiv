@@ -16,10 +16,10 @@ See [PRODUCT.md](PRODUCT.md) for the full product vision.
 | 4 | Speaker Analysis | done |
 | 5 | Audience Analysis | done |
 | 6 | Fusion | done |
-| 7 | LLM Reasoning + Report | not started |
+| 7 | LLM Reasoning + Report | done |
 | 8 | Config + Polish | not started |
 
-**Currently working on:** Step 7
+**Currently working on:** Step 8
 
 ---
 

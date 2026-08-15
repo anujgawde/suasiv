@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import yaml
 from rich.console import Console
 
 from suasiv.analyzers import ALL_ANALYZERS
@@ -12,7 +13,7 @@ from suasiv.fusion import fuse, stitch_chunk_results
 from suasiv.ingest import ingest
 from suasiv.llm import get_backend
 from suasiv.report import render_report
-from suasiv.schema import AnalyzerResult, CoachingReport
+from suasiv.schema import AnalyzerResult, CoachingReport, FusedTimeline
 
 console = Console()
 
@@ -91,21 +92,16 @@ def run_pipeline(video_path: str, config: SuasivConfig) -> Path:
     console.print(f"  {len(timeline.signals)} signals, {len(timeline.moments)} moments")
 
     console.print("[dim]Step 4/5:[/dim] Generating coaching narrative...")
-    llm = get_backend(config.llm.backend)
-    narrative = llm.complete(
-        system="You are a communication coach. Use observable signals, never inferred emotions.",
-        prompt=f"Analyze this presentation based on the following signals:\n{timeline.model_dump_json(indent=2)}",
-    )
+    rubric = _load_rubric()
+    scores = _compute_scores(results, rubric)
+    system_prompt = _build_system_prompt(rubric)
+    user_prompt = _build_user_prompt(ctx, results, timeline, scores)
+
+    llm = get_backend(config.llm.backend, config.llm)
+    narrative = llm.complete(system_prompt, user_prompt)
 
     report = CoachingReport(
-        summary_scores={
-            "pacing": 0.7,
-            "prosody": 0.55,
-            "content": 0.7,
-            "speaker_facial": 0.6,
-            "audience_engagement": 0.72,
-            "audience_reaction": 0.65,
-        },
+        summary_scores=scores,
         narrative=narrative,
         timeline=timeline,
         metadata={
@@ -125,6 +121,195 @@ def run_pipeline(video_path: str, config: SuasivConfig) -> Path:
         f"\n[bold green]Done![/bold green] Report saved to [cyan]{output}[/cyan]\n"
     )
     return output
+
+
+# ---------------------------------------------------------------------------
+# Rubric + scoring
+# ---------------------------------------------------------------------------
+
+
+def _load_rubric() -> dict:
+    for candidate in [
+        Path("rubric.yaml"),
+        Path(__file__).resolve().parent.parent.parent / "rubric.yaml",
+    ]:
+        if candidate.exists():
+            with open(candidate) as f:
+                return yaml.safe_load(f) or {}
+    return {}
+
+
+def _compute_scores(results: list[AnalyzerResult], rubric: dict) -> dict[str, float]:
+    summaries = {r.analyzer: r.summary for r in results}
+    dims = rubric.get("dimensions", {})
+    scores: dict[str, float] = {}
+
+    if "pacing" in summaries and not summaries["pacing"].get("error"):
+        s = summaries["pacing"]
+        t = dims.get("pacing", {}).get("thresholds", {})
+        wpm = s.get("overall_wpm", 130)
+        wpm_lo = t.get("wpm_low", 100)
+        wpm_hi = t.get("wpm_high", 180)
+        wpm_score = 1.0
+        if wpm < wpm_lo:
+            wpm_score = max(0.2, wpm / wpm_lo)
+        elif wpm > wpm_hi:
+            wpm_score = max(0.2, wpm_hi / wpm)
+
+        filler_rate = s.get("filler_rate", 0)
+        bad = t.get("filler_rate_bad", 0.06)
+        conc = t.get("filler_rate_concerning", 0.03)
+        if filler_rate >= bad:
+            filler_score = 0.2
+        elif filler_rate >= conc:
+            filler_score = 1.0 - 0.8 * (filler_rate - conc) / (bad - conc)
+        else:
+            filler_score = 1.0
+
+        scores["pacing"] = round(wpm_score * 0.5 + filler_score * 0.5, 2)
+
+    if "prosody" in summaries and not summaries["prosody"].get("error"):
+        s = summaries["prosody"]
+        t = dims.get("prosody", {}).get("thresholds", {})
+        variety = s.get("vocal_variety_score", 0.3)
+        variety_low = t.get("vocal_variety_low", 0.3)
+        variety_score = min(1.0, variety / variety_low) if variety_low > 0 else 0.5
+        monotone = s.get("monotone_segments", 0)
+        monotone_score = max(0.0, 1.0 - monotone * 0.15)
+        scores["prosody"] = round(variety_score * 0.6 + monotone_score * 0.4, 2)
+
+    if "content" in summaries and not summaries["content"].get("error"):
+        scores["content"] = round(summaries["content"].get("structure_score", 0.5), 2)
+
+    if "speaker_facial" in summaries and not summaries["speaker_facial"].get("error"):
+        s = summaries["speaker_facial"]
+        eye = s.get("eye_contact_pct", 0.5)
+        facing = s.get("facing_audience_pct", 0.5)
+        expr = s.get("expressiveness_score", 0.5)
+        scores["speaker_facial"] = round(eye * 0.4 + facing * 0.3 + expr * 0.3, 2)
+
+    if "audience_engagement" in summaries and not summaries["audience_engagement"].get(
+        "error"
+    ):
+        s = summaries["audience_engagement"]
+        attention = s.get("overall_attention_pct", 0.5)
+        drops = s.get("attention_drops", 0)
+        drop_penalty = max(0.0, 1.0 - drops * 0.1)
+        scores["audience_engagement"] = round(
+            attention * 0.7 + drop_penalty * 0.3, 2
+        )
+
+    if "audience_reaction" in summaries and not summaries["audience_reaction"].get(
+        "error"
+    ):
+        s = summaries["audience_reaction"]
+        positive = s.get("positive_reaction_pct", 0)
+        negative = s.get("negative_reaction_pct", 0)
+        t = dims.get("audience_reaction", {}).get("thresholds", {})
+        pos_low = t.get("positive_ratio_low", 0.3)
+        neg_high = t.get("negative_ratio_high", 0.3)
+        pos_score = min(1.0, positive / pos_low) if pos_low > 0 else 0.5
+        neg_score = max(0.0, 1.0 - negative / neg_high) if neg_high > 0 else 1.0
+        scores["audience_reaction"] = round(pos_score * 0.6 + neg_score * 0.4, 2)
+
+    return scores
+
+
+# ---------------------------------------------------------------------------
+# Prompt engineering
+# ---------------------------------------------------------------------------
+
+
+def _build_system_prompt(rubric: dict) -> str:
+    coaching = rubric.get("coaching", {})
+    framing = coaching.get(
+        "framing",
+        "Reference observable signals, never inferred emotions. Be specific and actionable.",
+    )
+
+    dim_lines: list[str] = []
+    for name, dim in rubric.get("dimensions", {}).items():
+        dim_lines.append(
+            f"- {name.replace('_', ' ').title()}: "
+            f"Good = {dim.get('good', 'N/A')}; "
+            f"Concerning = {dim.get('concerning', 'N/A')}; "
+            f"Needs work = {dim.get('bad', 'N/A')}"
+        )
+
+    return (
+        "You are a communication coach analyzing a recorded presentation.\n\n"
+        f"RULES:\n{framing}\n\n"
+        "SCORING CRITERIA:\n"
+        f"{chr(10).join(dim_lines)}\n\n"
+        "Produce your analysis with these sections:\n"
+        "## Overall Assessment\n"
+        "2-3 sentences summarizing strengths and areas for improvement.\n\n"
+        "## What Worked\n"
+        "Bullet points with timestamps and signal evidence. "
+        "Reference audience response where available.\n\n"
+        "## What to Improve\n"
+        "Bullet points with timestamps and signal evidence. "
+        "Be constructive.\n\n"
+        "## Key Moments\n"
+        "Numbered list of significant moments with timestamps, "
+        "what the speaker did, and how the audience responded.\n\n"
+        "## Audience Reception\n"
+        "Attention patterns, reaction trends, verbal interaction summary.\n\n"
+        "## Next Steps\n"
+        "3-5 specific, actionable recommendations.\n\n"
+        "Format timestamps as M:SS. Reference actual signal data."
+    )
+
+
+def _fmt(seconds: float) -> str:
+    s = max(0, int(seconds))
+    return f"{s // 60}:{s % 60:02d}"
+
+
+def _build_user_prompt(
+    ctx: MediaContext,
+    results: list[AnalyzerResult],
+    timeline: FusedTimeline,
+    scores: dict[str, float],
+) -> str:
+    score_lines = [
+        f"- {n.replace('_', ' ').title()}: {v * 100:.0f}%"
+        for n, v in scores.items()
+    ]
+
+    summary_lines: list[str] = []
+    for r in results:
+        if r.summary and not r.summary.get("error"):
+            items = ", ".join(f"{k}={v}" for k, v in r.summary.items())
+            summary_lines.append(f"- {r.analyzer}: {items}")
+
+    moment_lines: list[str] = []
+    for i, m in enumerate(timeline.moments[:15]):
+        moment_lines.append(
+            f"{i + 1}. [{_fmt(m.start)}-{_fmt(m.end)}] "
+            f"{m.type.upper()} (sig={m.significance}): {m.description}"
+        )
+
+    signal_lines: list[str] = []
+    for s in timeline.signals[:100]:
+        val = f" ({s.value})" if s.value is not None else ""
+        signal_lines.append(f"  {_fmt(s.start)} {s.analyzer}/{s.type}{val}")
+
+    return (
+        f"Analyze this presentation ({_fmt(ctx.duration)} duration).\n\n"
+        f"DIMENSION SCORES:\n{chr(10).join(score_lines)}\n\n"
+        f"ANALYZER SUMMARIES:\n{chr(10).join(summary_lines)}\n\n"
+        "KEY MOMENTS (ranked by significance):\n"
+        f"{chr(10).join(moment_lines) or 'None detected.'}\n\n"
+        f"SIGNAL TIMELINE ({len(timeline.signals)} total, "
+        f"showing first {min(100, len(timeline.signals))}):\n"
+        f"{chr(10).join(signal_lines) or 'No signals.'}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Long-video chunking
+# ---------------------------------------------------------------------------
 
 
 def _compute_chunks(
@@ -168,7 +353,8 @@ def _run_chunked(
 
     for ci, (c_start, c_end) in enumerate(chunks):
         console.print(
-            f"  [dim]Chunk {ci + 1}/{len(chunks)} ({c_start:.0f}–{c_end:.0f}s)[/dim]"
+            f"  [dim]Chunk {ci + 1}/{len(chunks)} "
+            f"({_fmt(c_start)}–{_fmt(c_end)})[/dim]"
         )
         chunk_ctx = _create_chunk_context(ctx, c_start, c_end)
         chunk_results: list[AnalyzerResult] = []
