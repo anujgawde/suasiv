@@ -13,13 +13,13 @@ See [PRODUCT.md](PRODUCT.md) for the full product vision.
 | 1 | Skeleton | done |
 | 2 | Ingest | done |
 | 3 | Transcription + Diarization | done |
-| 4 | Speaker Analysis | not started |
+| 4 | Speaker Analysis | done |
 | 5 | Audience Analysis | not started |
 | 6 | Fusion | not started |
 | 7 | LLM Reasoning + Report | not started |
 | 8 | Config + Polish | not started |
 
-**Currently working on:** Step 4
+**Currently working on:** Step 5
 
 ---
 
