@@ -10,16 +10,16 @@ See [PRODUCT.md](PRODUCT.md) for the full product vision.
 
 | Step | Name | Status |
 |------|------|--------|
-| 1 | Skeleton | not started |
-| 2 | Ingest | not started |
-| 3 | Transcription + Diarization | not started |
+| 1 | Skeleton | done |
+| 2 | Ingest | done |
+| 3 | Transcription + Diarization | done |
 | 4 | Speaker Analysis | not started |
 | 5 | Audience Analysis | not started |
 | 6 | Fusion | not started |
 | 7 | LLM Reasoning + Report | not started |
 | 8 | Config + Polish | not started |
 
-**Currently working on:** Step 1
+**Currently working on:** Step 4
 
 ---
 
