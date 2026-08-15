@@ -30,6 +30,8 @@ class IngestConfig(BaseModel):
 
 class FusionConfig(BaseModel):
     window_seconds: int = 5
+    chunk_seconds: int = 600
+    chunk_overlap: int = 30
 
 
 class SuasivConfig(BaseModel):

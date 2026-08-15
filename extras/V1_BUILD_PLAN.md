@@ -15,11 +15,11 @@ See [PRODUCT.md](PRODUCT.md) for the full product vision.
 | 3 | Transcription + Diarization | done |
 | 4 | Speaker Analysis | done |
 | 5 | Audience Analysis | done |
-| 6 | Fusion | not started |
+| 6 | Fusion | done |
 | 7 | LLM Reasoning + Report | not started |
 | 8 | Config + Polish | not started |
 
-**Currently working on:** Step 6
+**Currently working on:** Step 7
 
 ---
 

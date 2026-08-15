@@ -40,3 +40,5 @@ ingest:
 
 fusion:
   window_seconds: 5
+  chunk_seconds: 600    # chunk frame-based analyzers for videos longer than this
+  chunk_overlap: 30     # overlap between chunks to avoid boundary artifacts
