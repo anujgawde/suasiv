@@ -1,0 +1,88 @@
+dimensions:
+  delivery_confidence:
+    description: "How assured and authoritative the speaker sounds"
+    sources:
+      - audeering dominance scores
+      - vocal energy consistency
+      - hedging frequency
+    levels:
+      excellent: "Speaker projects consistent authority with minimal hedging"
+      good: "Generally confident delivery with occasional uncertainty"
+      developing: "Noticeable hesitation or hedging undermines authority"
+      needs_work: "Frequent uncertainty signals — hedging, low energy, tentative phrasing"
+      poor: "Speaker sounds consistently unsure or disengaged"
+
+  vocal_variety:
+    description: "Pitch and energy variation — monotone vs. dynamic delivery"
+    sources:
+      - openSMILE pitch statistics (F0 mean, std, range)
+      - energy envelope variation
+      - audeering arousal scores
+    levels:
+      excellent: "Wide pitch range, dynamic energy — naturally engaging to listen to"
+      good: "Reasonable variation with some flat stretches"
+      developing: "Limited variation — extended monotone sections"
+      needs_work: "Mostly monotone delivery with little pitch or energy change"
+      poor: "Flat throughout — no vocal variation detected"
+
+  pacing_fluency:
+    description: "Speaking rate, pauses, and disfluencies"
+    sources:
+      - CrisperWhisper filler/stutter counts
+      - words per minute
+      - pause frequency and duration
+    levels:
+      excellent: "Clean delivery — natural pace, strategic pauses, minimal fillers"
+      good: "Good pacing with occasional fillers or rushed segments"
+      developing: "Noticeable fillers or inconsistent pacing"
+      needs_work: "Frequent fillers, rushed or dragging segments"
+      poor: "Excessive disfluencies or erratic pacing throughout"
+
+  content_clarity:
+    description: "How clearly ideas are organized and communicated"
+    sources:
+      - transition frequency
+      - hedging rate
+      - segment length variance
+      - topic coherence
+    levels:
+      excellent: "Well-structured with clear transitions and focused segments"
+      good: "Generally clear with minor organizational gaps"
+      developing: "Some structure present but transitions are weak or missing"
+      needs_work: "Disorganized — hard to follow the thread"
+      poor: "No discernible structure or flow"
+
+  engagement:
+    description: "How effectively the speaker holds audience attention"
+    sources:
+      - audience attention timeline (if available)
+      - audience reaction signals (if available)
+      - vocal energy + expressiveness as proxy
+    levels:
+      excellent: "Audience consistently engaged — high attention, positive reactions"
+      good: "Mostly engaged with minor attention dips"
+      developing: "Mixed engagement — noticeable drops and recoveries"
+      needs_work: "Frequent attention drops or disengagement signals"
+      poor: "Audience largely disengaged throughout"
+
+  overall_impact:
+    description: "Composite assessment of presentation effectiveness"
+    sources:
+      - quality classifier composite score
+      - weighted combination of other dimensions
+    levels:
+      excellent: "Compelling, polished presentation that achieves its purpose"
+      good: "Solid presentation with clear strengths"
+      developing: "Adequate but with clear areas for improvement"
+      needs_work: "Below expectations — multiple dimensions need attention"
+      poor: "Ineffective presentation across most dimensions"
+
+coaching_tone:
+  framing: "signals not emotions"
+  guidelines:
+    - "Reference observable signals, not inferred emotional states"
+    - "Say 'energy dropped at 4:32' not 'the audience was bored at 4:32'"
+    - "Say 'hedging language increased' not 'speaker seemed nervous'"
+    - "Be specific — cite timestamps and measurable patterns"
+    - "Be constructive — pair each observation with an actionable suggestion"
+    - "Acknowledge strengths before addressing areas for improvement"
