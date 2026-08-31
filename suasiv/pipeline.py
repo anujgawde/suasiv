@@ -7,6 +7,7 @@ from rich.console import Console
 from suasiv.config import SuasivConfig
 from suasiv.ingest import ingest
 from suasiv.report.renderer import render_markdown
+from suasiv.transcribe import transcribe
 from suasiv.schema import (
     CoachingReport,
     Dimension,
@@ -29,6 +30,9 @@ def run(video: Path, config: SuasivConfig) -> CoachingReport:
 
     console.print("[dim]ingest[/dim]")
     ctx = _ingest(ctx, config)
+
+    console.print("[dim]transcribe[/dim]")
+    ctx = _transcribe(ctx, config)
 
     console.print("[dim]analyze[/dim]")
     signals = _analyze(ctx, config)
@@ -56,6 +60,11 @@ def run(video: Path, config: SuasivConfig) -> CoachingReport:
 
 def _ingest(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
     return ingest(ctx, config)
+
+
+def _transcribe(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
+    ctx.transcript = transcribe(ctx.audio_path, config.transcription)
+    return ctx
 
 
 def _analyze(ctx: MediaContext, config: SuasivConfig) -> list[Signal]:

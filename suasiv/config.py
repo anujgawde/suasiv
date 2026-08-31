@@ -13,7 +13,7 @@ class IngestConfig(BaseModel):
 
 
 class TranscriptionConfig(BaseModel):
-    model: str = "nyrahealth/CrisperWhisper"
+    model: str = "small"
     device: str = "auto"
     batch_size: int = 16
     language: str | None = None

@@ -5,7 +5,7 @@ ingest:
   tile_detection: true
 
 transcription:
-  model: "nyrahealth/CrisperWhisper"
+  model: "small"
   device: "auto"
 
 diarization:
