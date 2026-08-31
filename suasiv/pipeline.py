@@ -5,6 +5,7 @@ from pathlib import Path
 from rich.console import Console
 
 from suasiv.config import SuasivConfig
+from suasiv.report.renderer import render_markdown
 from suasiv.schema import (
     CoachingReport,
     Dimension,
@@ -99,5 +100,12 @@ def _narrate(
 
 def _render(report: CoachingReport, ctx: MediaContext, config: SuasivConfig) -> None:
     out = ctx.workspace / "report.md"
-    out.write_text(f"# Coaching Report\n\nStub report for {ctx.video_path.name}\n")
+    render_markdown(
+        video_name=ctx.video_path.name,
+        duration=report.duration,
+        scores=report.scores,
+        moments=report.moments,
+        narrative=report.narrative,
+        output_path=out,
+    )
     console.print(f"[green]report written to {out}[/green]")

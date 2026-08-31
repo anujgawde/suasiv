@@ -1,0 +1,38 @@
+# Coaching Report — {{ video_name }}
+
+Duration: {{ duration | fmt_time }}
+
+---
+
+## Scores
+
+{% for s in scores %}
+### {{ s.dimension.value | replace("_", " ") | title }}
+
+**{{ s.level | title }}** ({{ "%.2f" | format(s.score) }})
+
+{% if s.source %}{{ s.source }}{% endif %}
+{% endfor %}
+
+---
+
+## Key Moments
+
+{% for m in moments %}
+### {{ m.type.value | replace("_", " ") | title }} — {{ m.start | fmt_time }}–{{ m.end | fmt_time }}
+
+{{ m.description }}
+
+{% if m.signals %}
+Signals:
+{% for sig in m.signals %}
+- {{ sig.type.value | replace("_", " ") }}: {{ sig.value }} ({{ sig.start | fmt_time }}–{{ sig.end | fmt_time }})
+{% endfor %}
+{% endif %}
+{% endfor %}
+
+---
+
+## Coaching Narrative
+
+{{ narrative }}
