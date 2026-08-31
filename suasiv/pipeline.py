@@ -5,6 +5,7 @@ from pathlib import Path
 from rich.console import Console
 
 from suasiv.config import SuasivConfig
+from suasiv.ingest import ingest
 from suasiv.report.renderer import render_markdown
 from suasiv.schema import (
     CoachingReport,
@@ -54,8 +55,7 @@ def run(video: Path, config: SuasivConfig) -> CoachingReport:
 
 
 def _ingest(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
-    ctx.duration = 120.0
-    return ctx
+    return ingest(ctx)
 
 
 def _analyze(ctx: MediaContext, config: SuasivConfig) -> list[Signal]:
