@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from suasiv.config import SuasivConfig
 from suasiv.schema import MediaContext
 
 
@@ -63,7 +64,25 @@ def extract_audio(video: Path, output: Path) -> Path:
     return output
 
 
-def ingest(ctx: MediaContext) -> MediaContext:
+def sample_frames(video: Path, output_dir: Path, fps: float) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-i", str(video),
+            "-vf", f"fps={fps}",
+            "-q:v", "2",
+            "-y",
+            str(output_dir / "frame_%06d.png"),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return output_dir
+
+
+def ingest(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
     check_ffmpeg()
 
     probe = probe_metadata(ctx.video_path)
@@ -82,5 +101,9 @@ def ingest(ctx: MediaContext) -> MediaContext:
     audio_path = ctx.workspace / "audio.wav"
     extract_audio(ctx.video_path, audio_path)
     ctx.audio_path = audio_path
+
+    frames_dir = ctx.workspace / "frames"
+    sample_frames(ctx.video_path, frames_dir, config.ingest.fps)
+    ctx.frames_dir = frames_dir
 
     return ctx

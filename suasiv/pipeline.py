@@ -55,7 +55,7 @@ def run(video: Path, config: SuasivConfig) -> CoachingReport:
 
 
 def _ingest(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
-    return ingest(ctx)
+    return ingest(ctx, config)
 
 
 def _analyze(ctx: MediaContext, config: SuasivConfig) -> list[Signal]:
