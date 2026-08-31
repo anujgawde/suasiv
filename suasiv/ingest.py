@@ -6,8 +6,11 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import cv2
+import numpy as np
+
 from suasiv.config import SuasivConfig
-from suasiv.schema import MediaContext
+from suasiv.schema import MediaContext, Tile
 
 
 def check_ffmpeg() -> None:
@@ -82,6 +85,35 @@ def sample_frames(video: Path, output_dir: Path, fps: float) -> Path:
     return output_dir
 
 
+def detect_tiles(frame_path: Path, min_tile_area: int) -> list[Tile]:
+    img = cv2.imread(str(frame_path))
+    if img is None:
+        return []
+
+    h, w = img.shape[:2]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    edges = cv2.dilate(edges, kernel, iterations=2)
+
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    tiles = []
+    for contour in contours:
+        x, y, cw, ch = cv2.boundingRect(contour)
+        if cw * ch < min_tile_area:
+            continue
+        aspect = cw / ch if ch else 0
+        if 0.5 < aspect < 2.5:
+            tiles.append(Tile(x=x, y=y, w=cw, h=ch, participant_id=len(tiles)))
+
+    if not tiles:
+        tiles = [Tile(x=0, y=0, w=w, h=h, participant_id=0)]
+
+    return tiles
+
+
 def ingest(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
     check_ffmpeg()
 
@@ -105,5 +137,11 @@ def ingest(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
     frames_dir = ctx.workspace / "frames"
     sample_frames(ctx.video_path, frames_dir, config.ingest.fps)
     ctx.frames_dir = frames_dir
+
+    if config.ingest.tile_detection:
+        first_frame = sorted(frames_dir.glob("*.png"))[0]
+        ctx.tiles = detect_tiles(first_frame, config.ingest.min_tile_area)
+    else:
+        ctx.tiles = [Tile(x=0, y=0, w=ctx.width, h=ctx.height, participant_id=0)]
 
     return ctx
