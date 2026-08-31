@@ -5,6 +5,7 @@ from pathlib import Path
 from rich.console import Console
 
 from suasiv.config import SuasivConfig
+from suasiv.diarize import diarize
 from suasiv.ingest import ingest
 from suasiv.report.renderer import render_markdown
 from suasiv.transcribe import transcribe
@@ -33,6 +34,9 @@ def run(video: Path, config: SuasivConfig) -> CoachingReport:
 
     console.print("[dim]transcribe[/dim]")
     ctx = _transcribe(ctx, config)
+
+    console.print("[dim]diarize[/dim]")
+    ctx = _diarize(ctx, config)
 
     console.print("[dim]analyze[/dim]")
     signals = _analyze(ctx, config)
@@ -65,6 +69,10 @@ def _ingest(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
 def _transcribe(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
     ctx.transcript = transcribe(ctx.audio_path, config.transcription)
     return ctx
+
+
+def _diarize(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
+    return diarize(ctx, config.diarization)
 
 
 def _analyze(ctx: MediaContext, config: SuasivConfig) -> list[Signal]:
