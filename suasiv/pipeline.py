@@ -4,6 +4,7 @@ from pathlib import Path
 
 from rich.console import Console
 
+from suasiv.audio.emotion import analyze_emotion
 from suasiv.config import SuasivConfig
 from suasiv.diarize import diarize
 from suasiv.ingest import ingest
@@ -76,11 +77,16 @@ def _diarize(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
 
 
 def _analyze(ctx: MediaContext, config: SuasivConfig) -> list[Signal]:
-    return [
-        Signal(type=SignalType.FILLER_WORD, source="transcription", start=15.2, end=15.5, value="um"),
-        Signal(type=SignalType.CONFIDENT_DELIVERY, source="emotion", start=0.0, end=30.0, value=0.72),
-        Signal(type=SignalType.EYE_CONTACT, source="speaker_visual", start=0.0, end=60.0, value=0.81),
-    ]
+    signals: list[Signal] = []
+
+    signals.extend(analyze_emotion(ctx, config.emotion))
+
+    # Stub: acoustic features (step 10)
+    # Stub: pacing (step 11)
+    # Stub: speaker visual (steps 12-13)
+    # Stub: content (steps 15-16)
+
+    return signals
 
 
 def _fuse(signals: list[Signal], config: SuasivConfig) -> list[Moment]:
