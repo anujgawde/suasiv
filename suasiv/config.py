@@ -10,6 +10,7 @@ class IngestConfig(BaseModel):
     fps: float = 3.0
     tile_detection: bool = True
     min_tile_area: int = 5000
+    gutter_intensity: float = 30.0
 
 
 class TranscriptionConfig(BaseModel):
