@@ -9,6 +9,7 @@ from suasiv.audio.features import analyze_features
 from suasiv.config import SuasivConfig
 from suasiv.diarize import diarize
 from suasiv.ingest import ingest
+from suasiv.pacing import analyze_pacing
 from suasiv.report.renderer import render_markdown
 from suasiv.transcribe import transcribe
 from suasiv.schema import (
@@ -84,7 +85,8 @@ def _analyze(ctx: MediaContext, config: SuasivConfig) -> list[Signal]:
 
     analyze_features(ctx, config.features)
 
-    # Stub: pacing (step 11)
+    signals.extend(analyze_pacing(ctx, config.pacing))
+
     # Stub: speaker visual (steps 12-13)
     # Stub: content (steps 15-16)
 
