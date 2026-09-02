@@ -27,7 +27,9 @@ dependencies = [
     "librosa>=0.10",
 
     # Visual analysis
-    "mediapipe>=0.10",
+    # 1.x aborts the process on Apple Silicon — its face graph initialises a
+    # Metal helper that is unavailable, and it crashes past any CPU delegate.
+    "mediapipe>=0.10,<1.0",
     "py-feat>=0.6",
 
     # Scoring
