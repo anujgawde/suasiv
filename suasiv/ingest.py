@@ -4,6 +4,7 @@ import json
 import platform
 import shutil
 import subprocess
+from collections import defaultdict
 from pathlib import Path
 
 import cv2
@@ -11,6 +12,8 @@ import numpy as np
 
 from suasiv.config import SuasivConfig
 from suasiv.schema import MediaContext, Tile
+
+LAYOUT_SAMPLES = 12
 
 
 def check_ffmpeg() -> None:
@@ -85,33 +88,103 @@ def sample_frames(video: Path, output_dir: Path, fps: float) -> Path:
     return output_dir
 
 
-def detect_tiles(frame_path: Path, min_tile_area: int) -> list[Tile]:
+def _content_bands(
+    profile: np.ndarray, gutter_intensity: float, min_span: int
+) -> list[tuple[int, int]]:
+    """Runs along an intensity profile that sit above the gutter threshold."""
+    lit = profile >= gutter_intensity
+
+    bands: list[tuple[int, int]] = []
+    start: int | None = None
+
+    for i, is_content in enumerate(lit):
+        if is_content and start is None:
+            start = i
+        elif not is_content and start is not None:
+            if i - start >= min_span:
+                bands.append((start, i - 1))
+            start = None
+
+    if start is not None and len(lit) - start >= min_span:
+        bands.append((start, len(lit) - 1))
+
+    return bands
+
+
+def detect_tiles(
+    frame_path: Path, min_tile_area: int, gutter_intensity: float = 30.0
+) -> list[Tile]:
+    """Split a gallery grid on its gutters, row bands first then columns.
+
+    Column gutters only resolve within a row: a short final row leaves its
+    tiles unaligned with the rows above, so a full-height column profile
+    averages the gutters away.
+    """
     img = cv2.imread(str(frame_path))
     if img is None:
         return []
 
     h, w = img.shape[:2]
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 50, 150)
+    min_span = max(16, min(h, w) // 20)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    edges = cv2.dilate(edges, kernel, iterations=2)
+    tiles: list[Tile] = []
 
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for top, bottom in _content_bands(gray.mean(axis=1), gutter_intensity, min_span):
+        strip = gray[top : bottom + 1, :]
+        height = bottom - top + 1
 
-    tiles = []
-    for contour in contours:
-        x, y, cw, ch = cv2.boundingRect(contour)
-        if cw * ch < min_tile_area:
-            continue
-        aspect = cw / ch if ch else 0
-        if 0.5 < aspect < 2.5:
-            tiles.append(Tile(x=x, y=y, w=cw, h=ch, participant_id=len(tiles)))
+        for left, right in _content_bands(
+            strip.mean(axis=0), gutter_intensity, min_span
+        ):
+            width = right - left + 1
+
+            if width * height < min_tile_area:
+                continue
+            if not 0.4 < width / height < 3.0:
+                continue
+
+            tiles.append(Tile(
+                x=left, y=top, w=width, h=height, participant_id=len(tiles),
+            ))
 
     if not tiles:
         tiles = [Tile(x=0, y=0, w=w, h=h, participant_id=0)]
 
     return tiles
+
+
+def detect_layout(
+    frames_dir: Path,
+    min_tile_area: int,
+    gutter_intensity: float,
+    samples: int = LAYOUT_SAMPLES,
+) -> list[Tile]:
+    """The tile layout that holds across the recording.
+
+    Recordings fade in and rearrange as people join, so a single frame — the
+    first one most of all — can catch a transitional grid. Take the layout
+    seen most often instead.
+    """
+    frames = sorted(frames_dir.glob("*.png"))
+    if not frames:
+        return []
+
+    step = max(1, len(frames) // samples)
+    layouts: dict[int, list[list[Tile]]] = defaultdict(list)
+
+    for frame in frames[::step][:samples]:
+        tiles = detect_tiles(frame, min_tile_area, gutter_intensity)
+        if tiles:
+            layouts[len(tiles)].append(tiles)
+
+    if not layouts:
+        return []
+
+    # Most frequent layout; on a tie the busier grid, since a fade-in reads as
+    # fewer tiles than the settled view.
+    _, candidates = max(layouts.items(), key=lambda kv: (len(kv[1]), kv[0]))
+    return candidates[0]
 
 
 def ingest(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
@@ -139,9 +212,13 @@ def ingest(ctx: MediaContext, config: SuasivConfig) -> MediaContext:
     ctx.frames_dir = frames_dir
 
     if config.ingest.tile_detection:
-        first_frame = sorted(frames_dir.glob("*.png"))[0]
-        ctx.tiles = detect_tiles(first_frame, config.ingest.min_tile_area)
-    else:
+        ctx.tiles = detect_layout(
+            frames_dir,
+            config.ingest.min_tile_area,
+            config.ingest.gutter_intensity,
+        )
+
+    if not ctx.tiles:
         ctx.tiles = [Tile(x=0, y=0, w=ctx.width, h=ctx.height, participant_id=0)]
 
     return ctx
