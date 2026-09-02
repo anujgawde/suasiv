@@ -5,6 +5,7 @@ from pathlib import Path
 from rich.console import Console
 
 from suasiv.audio.emotion import analyze_emotion
+from suasiv.audio.features import analyze_features
 from suasiv.config import SuasivConfig
 from suasiv.diarize import diarize
 from suasiv.ingest import ingest
@@ -81,7 +82,8 @@ def _analyze(ctx: MediaContext, config: SuasivConfig) -> list[Signal]:
 
     signals.extend(analyze_emotion(ctx, config.emotion))
 
-    # Stub: acoustic features (step 10)
+    analyze_features(ctx, config.features)
+
     # Stub: pacing (step 11)
     # Stub: speaker visual (steps 12-13)
     # Stub: content (steps 15-16)

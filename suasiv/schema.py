@@ -195,6 +195,7 @@ class MediaContext:
     transcript: Transcript | None = None
     primary_speaker: str | None = None
     speaker_labels: list[str] = field(default_factory=list)
+    acoustic_features: list[dict] = field(default_factory=list)
 
 
 @dataclass
