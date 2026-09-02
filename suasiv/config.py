@@ -36,6 +36,20 @@ class FeaturesConfig(BaseModel):
     segment_duration: float = 30.0
 
 
+class PacingConfig(BaseModel):
+    window_seconds: float = 15.0
+    hop_seconds: float = 5.0
+    min_voiced_seconds: float = 4.0
+    rush_wpm: float = 190.0
+    drag_wpm: float = 105.0
+    baseline_swing_wpm: float = 40.0
+    min_pause_seconds: float = 1.5
+    filler_pause_seconds: float = 0.2
+    repeat_gap_seconds: float = 0.6
+    false_start_break_seconds: float = 0.25
+    false_start_lookahead: int = 5
+
+
 class QualityConfig(BaseModel):
     model_dir: str = "training/models"
 
@@ -83,6 +97,7 @@ class SuasivConfig(BaseModel):
     diarization: DiarizationConfig = Field(default_factory=DiarizationConfig)
     emotion: EmotionConfig = Field(default_factory=EmotionConfig)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
+    pacing: PacingConfig = Field(default_factory=PacingConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)
     speaker_visual: SpeakerVisualConfig = Field(default_factory=SpeakerVisualConfig)
     audience_visual: AudienceVisualConfig = Field(default_factory=AudienceVisualConfig)

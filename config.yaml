@@ -18,6 +18,11 @@ emotion:
 features:
   feature_set: "eGeMAPSv02"
 
+pacing:
+  rush_wpm: 190.0
+  drag_wpm: 105.0
+  min_pause_seconds: 1.5
+
 speaker_visual:
   enabled: true
 
