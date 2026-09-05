@@ -58,6 +58,8 @@ class QualityConfig(BaseModel):
 class SpeakerVisualConfig(BaseModel):
     enabled: bool = True
     min_face_confidence: float = 0.5
+    reference_dir: str = "reference"
+    window_seconds: float = 5.0
 
 
 class AudienceVisualConfig(BaseModel):

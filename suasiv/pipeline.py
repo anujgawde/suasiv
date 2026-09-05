@@ -6,6 +6,7 @@ from rich.console import Console
 
 from suasiv.audio.emotion import analyze_emotion
 from suasiv.audio.features import analyze_features
+from suasiv.visual.speaker import analyze_speaker_visual
 from suasiv.config import SuasivConfig
 from suasiv.diarize import diarize
 from suasiv.ingest import ingest
@@ -87,7 +88,8 @@ def _analyze(ctx: MediaContext, config: SuasivConfig) -> list[Signal]:
 
     signals.extend(analyze_pacing(ctx, config.pacing))
 
-    # Stub: speaker visual (steps 12-13)
+    signals.extend(analyze_speaker_visual(ctx, config.speaker_visual))
+
     # Stub: content (steps 15-16)
 
     return signals
